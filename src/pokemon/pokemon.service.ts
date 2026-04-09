@@ -1,15 +1,19 @@
-import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
-import { CreatePokemonDto } from './dto/create-pokemon.dto';
-import { UpdatePokemonDto } from './dto/update-pokemon.dto';
-import { isValidObjectId, Model } from 'mongoose';
-import { Pokemon } from './entities/pokemon.entity';
-import { InjectModel } from '@nestjs/mongoose';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+} from "@nestjs/common";
+import { CreatePokemonDto } from "./dto/create-pokemon.dto";
+import { UpdatePokemonDto } from "./dto/update-pokemon.dto";
+import { isValidObjectId, Model } from "mongoose";
+import { Pokemon } from "./entities/pokemon.entity";
+import { InjectModel } from "@nestjs/mongoose";
+import { PaginationDto } from "src/common/dto/pagination.dto";
 
 @Injectable()
 export class PokemonService {
-
   constructor(
-    @InjectModel(Pokemon.name) private readonly pokemonModel: Model<Pokemon>
+    @InjectModel(Pokemon.name) private readonly pokemonModel: Model<Pokemon>,
   ) {}
 
   async create(createPokemonDto: CreatePokemonDto) {
@@ -22,8 +26,16 @@ export class PokemonService {
     }
   }
 
-  findAll() {
-    return `This action returns all pokemon`;
+  async findAll(paginationDto: PaginationDto) {
+    let { limit, offset } = paginationDto;
+    if (!limit) limit = 10;
+    if (!offset) offset = 0;
+    return await this.pokemonModel
+      .find()
+      .limit(limit)
+      .skip(offset)
+      .sort({ no: 1 })
+      .select("-__v");
   }
 
   async findOne(term: string) {
@@ -34,7 +46,9 @@ export class PokemonService {
     } else if (isValidObjectId(term)) {
       pokemon = await this.pokemonModel.findById(term);
     } else {
-      pokemon = await this.pokemonModel.findOne({ name: term.toLowerCase().trim() });
+      pokemon = await this.pokemonModel.findOne({
+        name: term.toLowerCase().trim(),
+      });
     }
 
     if (!pokemon) throw new BadRequestException(`Pokemon ${term} not found`);
@@ -58,15 +72,18 @@ export class PokemonService {
 
   async remove(term: string) {
     const pokemon = await this.findOne(term);
-      await pokemon.deleteOne();
-      return { ...pokemon.toJSON() };
-  
+    await pokemon.deleteOne();
+    return { ...pokemon.toJSON() };
   }
 
   private onReturnError(error: any, isEditing = false) {
     if ((error as { code: number }).code === 11000) {
-      throw new BadRequestException(`Ya existe un Pokemon con ${JSON.stringify(error.keyValue)}`);
+      throw new BadRequestException(
+        `Ya existe un Pokemon con ${JSON.stringify(error.keyValue)}`,
+      );
     }
-    throw new InternalServerErrorException(`Error ${isEditing ? 'actualizando' : 'eliminando'} pokemon`);
+    throw new InternalServerErrorException(
+      `Error ${isEditing ? "actualizando" : "eliminando"} pokemon`,
+    );
   }
 }
